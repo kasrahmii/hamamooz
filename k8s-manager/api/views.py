@@ -84,6 +84,29 @@ class BackupCreateView(APIView):
             status=status.HTTP_201_CREATED
         )
 
+    def get(self, request):
+
+        app_id = request.GET.get("app_id")
+
+        if not app_id:
+            return Response(
+                {
+                    "error": "app_id is required"
+                },
+                status=400
+            )
+
+        backups = Backup.objects.filter(
+            app_id=app_id
+        )
+
+        return Response(
+            BackupSerializer(
+                backups,
+                many=True
+            ).data
+        )
+
 @api_view(["GET", "POST"])
 def clusters(request):
 
