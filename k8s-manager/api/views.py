@@ -30,6 +30,8 @@ from .serializers import BackupSerializer
 
 from rest_framework.views import APIView
 
+from .tasks import run_backup
+
 
 class BackupCreateView(APIView):
 
@@ -51,6 +53,10 @@ class BackupCreateView(APIView):
             backup_id=f"bkp_{uuid.uuid4().hex[:6]}",
             source_path=source_path,
             status="pending"
+        )
+
+        run_backup.delay(
+            backup.backup_id
         )
 
         return Response(
