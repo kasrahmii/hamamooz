@@ -49,3 +49,42 @@ class App(models.Model):
 
     def __str__(self):
         return self.name
+
+class Backup(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "pending"),
+        ("running", "running"),
+        ("completed", "completed"),
+        ("failed", "failed"),
+    ]
+
+    app = models.ForeignKey(
+        App,
+        on_delete=models.CASCADE
+    )
+
+    backup_id = models.CharField(
+        max_length=100,
+        unique=True
+    )
+
+    source_path = models.CharField(
+        max_length=255
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending"
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
+
+    def __str__(self):
+        return self.backup_id
