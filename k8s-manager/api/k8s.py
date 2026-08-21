@@ -1,5 +1,5 @@
 from kubernetes import client
-
+from kubernetes.stream import stream
 
 def get_configuration(cluster):
     configuration = client.Configuration()
@@ -34,3 +34,25 @@ def get_apps_client(cluster):
     )
 
     return client.AppsV1Api(api_client)
+
+def exec_in_pod(cluster, namespace, pod_name, command):
+    configuration = get_configuration(cluster)
+
+    api_client = client.ApiClient(
+        configuration=configuration
+    )
+
+    core_api = client.CoreV1Api(api_client)
+
+    response = stream(
+        core_api.connect_get_namespaced_pod_exec,
+        pod_name,
+        namespace,
+        command=command,
+        stderr=True,
+        stdin=False,
+        stdout=True,
+        tty=False,
+    )
+
+    return response

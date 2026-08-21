@@ -11,6 +11,10 @@ rules:
     resources: ["pods"]
     verbs: ["get", "list"]
 
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["get", "create"]
+    
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list", "create", "update", "patch", "delete"]
