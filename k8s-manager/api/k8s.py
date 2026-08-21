@@ -9,8 +9,7 @@ def get_configuration(cluster):
     else:
         configuration.host = f"https://{cluster.address}"
 
-    configuration.api_key["BearerToken"] = cluster.token
-    configuration.api_key_prefix["BearerToken"] = "Bearer"
+    configuration.api_key["authorization"] = f"Bearer {cluster.token}"
 
     configuration.verify_ssl = False
 
