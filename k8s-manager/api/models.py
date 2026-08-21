@@ -86,5 +86,11 @@ class Backup(models.Model):
         auto_now=True
     )
 
+    backup_path = models.CharField(
+        max_length=500,
+        null=True,
+        blank=True
+    )
+
     def __str__(self):
         return self.backup_id

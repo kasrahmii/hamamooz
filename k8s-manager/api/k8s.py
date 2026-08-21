@@ -70,3 +70,44 @@ def get_app_pod(cluster, namespace, app_name):
             return pod.metadata.name
 
     return None
+
+def read_file_from_pod(cluster, namespace, pod_name, path):
+    result = exec_in_pod(
+        cluster,
+        namespace,
+        pod_name,
+        [
+            "sh",
+            "-c",
+            f"cat {path}"
+        ]
+    )
+
+    return result
+
+def stream_backup_from_pod(cluster, namespace, pod_name, source_path):
+    configuration = get_configuration(cluster)
+
+    api_client = client.ApiClient(
+        configuration=configuration
+    )
+
+    core_api = client.CoreV1Api(api_client)
+
+    ws = stream(
+        core_api.connect_get_namespaced_pod_exec,
+        pod_name,
+        namespace,
+        command=[
+            "sh",
+            "-c",
+            f"tar czf - {source_path} | base64"
+        ],
+        stderr=False,
+        stdin=False,
+        stdout=True,
+        tty=False,
+        _preload_content=False,
+    )
+
+    return ws
