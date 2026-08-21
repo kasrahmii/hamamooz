@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Cluster, Namespace, App
+from .models import Backup
 
 class ClusterSerializer(serializers.ModelSerializer):
     class Meta:
@@ -64,3 +65,19 @@ class AppUpdateSerializer(serializers.Serializer):
         max_length=50,
         required=False
     )
+
+class BackupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Backup
+        fields = [
+            "backup_id",
+            "app",
+            "source_path",
+            "status",
+            "created_at",
+        ]
+        read_only_fields = [
+            "backup_id",
+            "status",
+            "created_at",
+        ]

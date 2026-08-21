@@ -24,6 +24,40 @@ from .k8s import (
 
 from kubernetes.client.rest import ApiException
 
+import uuid
+from .models import Backup, App
+from .serializers import BackupSerializer
+
+from rest_framework.views import APIView
+
+
+class BackupCreateView(APIView):
+
+    def post(self, request):
+
+        app_id = request.data.get("app_id")
+        source_path = request.data.get("source_path")
+
+        try:
+            app = App.objects.get(id=app_id)
+        except App.DoesNotExist:
+            return Response(
+                {"error": "App not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        backup = Backup.objects.create(
+            app=app,
+            backup_id=f"bkp_{uuid.uuid4().hex[:6]}",
+            source_path=source_path,
+            status="pending"
+        )
+
+        return Response(
+            BackupSerializer(backup).data,
+            status=status.HTTP_201_CREATED
+        )
+
 @api_view(["GET", "POST"])
 def clusters(request):
 
@@ -442,6 +476,9 @@ def apps(request):
             )
 
         if e.status == 401:
+            print("KUBERNETES ERROR:", e)
+            print("STATUS:", e.status)
+            print("BODY:", e.body)
             return Response(
                 {"error": "Kubernetes authentication failed"},
                 status=status.HTTP_401_UNAUTHORIZED
