@@ -7,6 +7,7 @@ from .views import (
     apps,
     app_detail,
     BackupCreateView,
+    backup_status
 )
 
 
@@ -18,6 +19,8 @@ urlpatterns = [
 
     path("apps/", apps),
     path("apps/<int:app_id>/", app_detail),
-    
+
     path("backup/",BackupCreateView.as_view()),
+
+    path("backup/<str:backup_id>/",backup_status),
 ]

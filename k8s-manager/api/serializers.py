@@ -74,7 +74,9 @@ class BackupSerializer(serializers.ModelSerializer):
             "app",
             "source_path",
             "status",
+            "backup_path",
             "created_at",
+            "updated_at",
         ]
         read_only_fields = [
             "backup_id",

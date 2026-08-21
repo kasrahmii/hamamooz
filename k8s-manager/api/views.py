@@ -33,6 +33,26 @@ from rest_framework.views import APIView
 from .tasks import run_backup
 
 
+@api_view(["GET"])
+def backup_status(request, backup_id):
+
+    try:
+        backup = Backup.objects.get(
+            backup_id=backup_id
+        )
+
+    except Backup.DoesNotExist:
+        return Response(
+            {
+                "error": "Backup not found"
+            },
+            status=404
+        )
+
+    return Response(
+        BackupSerializer(backup).data
+    )
+
 class BackupCreateView(APIView):
 
     def post(self, request):
