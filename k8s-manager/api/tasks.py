@@ -1,5 +1,6 @@
 from celery import shared_task
-from .models import Backup
+from .models import Backup, Cluster
+from .k8s import get_app_pod, exec_in_pod
 
 
 @shared_task(name="api.tasks.run_backup")
@@ -12,9 +13,45 @@ def run_backup(backup_id):
     backup.status = "running"
     backup.save()
 
-    print(f"Running backup {backup_id}")
+    try:
+        app = backup.app
 
-    backup.status = "completed"
-    backup.save()
+        cluster = app.namespace.cluster
 
-    return backup_id
+        pod_name = get_app_pod(
+            cluster,
+            app.namespace.name,
+            app.name
+        )
+
+        if not pod_name:
+            raise Exception("No running pod found")
+
+        command = [
+            "sh",
+            "-c",
+            f"tar czf /tmp/{backup_id}.tar.gz {backup.source_path}"
+        ]
+
+        result = exec_in_pod(
+            cluster,
+            app.namespace.name,
+            pod_name,
+            command
+        )
+
+        print(result)
+
+        backup.status = "completed"
+        backup.save()
+
+        return backup_id
+
+    except Exception as e:
+
+        print("Backup failed:", e)
+
+        backup.status = "failed"
+        backup.save()
+
+        raise e
