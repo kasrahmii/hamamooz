@@ -56,3 +56,17 @@ def exec_in_pod(cluster, namespace, pod_name, command):
     )
 
     return response
+
+def get_app_pod(cluster, namespace, app_name):
+    core_api = get_kubernetes_client(cluster)
+
+    pods = core_api.list_namespaced_pod(
+        namespace=namespace,
+        label_selector=f"app={app_name}"
+    )
+
+    for pod in pods.items:
+        if pod.status.phase == "Running":
+            return pod.metadata.name
+
+    return None
