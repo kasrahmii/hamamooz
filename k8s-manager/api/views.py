@@ -1,3 +1,4 @@
+from celery import shared_task
 from rest_framework.decorators import api_view, throttle_classes
 from .throttles import NamespaceCreateThrottle
 from rest_framework.response import Response
@@ -25,12 +26,14 @@ from .k8s import (
 from kubernetes.client.rest import ApiException
 
 import uuid
-from .models import Backup, App
+from .models import Backup, App, BackupSchedule
 from .serializers import BackupSerializer
 
 from rest_framework.views import APIView
 
 from .tasks import run_backup
+
+from django.core.cache import cache
 
 
 @api_view(["GET"])
@@ -318,6 +321,19 @@ def apps(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+
+        cache_key = f"apps-status-{namespace_id}"
+
+        cached_result = cache.get(cache_key)
+
+        if cached_result is not None:
+            print("REDIS CACHE HIT")
+            return Response(cached_result)
+
+
+        print("REDIS CACHE MISS")
+
+
         try:
             namespace = Namespace.objects.select_related(
                 "cluster"
@@ -329,11 +345,14 @@ def apps(request):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+
         apps = App.objects.filter(
             namespace=namespace
         )
 
+
         cluster = namespace.cluster
+
 
         try:
             k8s = get_kubernetes_client(cluster)
@@ -344,7 +363,9 @@ def apps(request):
                 status=status.HTTP_502_BAD_GATEWAY
             )
 
+
         result = []
+
 
         for app in apps:
 
@@ -373,14 +394,10 @@ def apps(request):
                     status=status.HTTP_502_BAD_GATEWAY
                 )
 
-            except Exception:
-                return Response(
-                    {"error": "Could not connect to Kubernetes"},
-                    status=status.HTTP_502_BAD_GATEWAY
-                )
 
             pods = []
             ready_count = 0
+
 
             for pod in pod_list.items:
 
@@ -388,6 +405,7 @@ def apps(request):
 
                 if pod.status.conditions:
                     for condition in pod.status.conditions:
+
                         if (
                             condition.type == "Ready"
                             and condition.status == "True"
@@ -395,8 +413,10 @@ def apps(request):
                             pod_ready = True
                             break
 
+
                 if pod_ready:
                     ready_count += 1
+
 
                 pods.append(
                     {
@@ -406,10 +426,12 @@ def apps(request):
                     }
                 )
 
+
             app_ready = (
                 len(pods) == app.replicas
                 and ready_count == app.replicas
             )
+
 
             result.append(
                 {
@@ -421,6 +443,15 @@ def apps(request):
                     "pods": pods,
                 }
             )
+
+
+        # SAVE RESULT IN REDIS FOR 60 SECONDS
+        cache.set(
+            cache_key,
+            result,
+            timeout=60
+        )
+
 
         return Response(result)
 
@@ -563,6 +594,10 @@ def apps(request):
         replicas=replicas,
         cpu=cpu,
         memory=memory,
+    )
+
+    cache.delete(
+        f"apps-status-{namespace.id}"
     )
 
     return Response(
@@ -774,3 +809,22 @@ def app_detail(request, app_id):
             "memory": app.memory,
         }
     )
+
+@shared_task(name="api.tasks.check_backup_schedules")
+def check_backup_schedules():
+
+    schedules = BackupSchedule.objects.filter(
+        enabled=True
+    )
+
+    for schedule in schedules:
+
+        backup = Backup.objects.create(
+            app=schedule.app,
+            backup_id=f"bkp_{uuid.uuid4().hex[:6]}",
+            source_path=schedule.source_path
+        )
+
+        run_backup.delay(
+            backup.backup_id
+        )

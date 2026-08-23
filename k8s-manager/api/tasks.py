@@ -1,10 +1,12 @@
 from celery import shared_task
-from .models import Backup, Cluster
+from .models import Backup, Cluster, BackupSchedule
 from .k8s import get_app_pod, exec_in_pod, stream_backup_from_pod
 import os
 from datetime import date
 import base64
-
+from django.utils import timezone
+from datetime import timedelta
+import uuid
 
 @shared_task(name="api.tasks.run_backup")
 def run_backup(backup_id):
@@ -82,3 +84,37 @@ def run_backup(backup_id):
         backup.save()
 
         raise e
+
+@shared_task(name="api.tasks.check_backup_schedules")
+def check_backup_schedules():
+
+    now = timezone.now()
+
+    schedules = BackupSchedule.objects.filter(
+        enabled=True
+    )
+
+    for schedule in schedules:
+
+        should_run = (
+            schedule.last_run is None or
+            now - schedule.last_run >= timedelta(
+                minutes=schedule.interval_minutes
+            )
+        )
+
+        if not should_run:
+            continue
+
+        backup = Backup.objects.create(
+            app=schedule.app,
+            backup_id=f"bkp_{uuid.uuid4().hex[:6]}",
+            source_path=schedule.source_path
+        )
+
+        schedule.last_run = now
+        schedule.save()
+
+        run_backup.delay(
+            backup.backup_id
+        )

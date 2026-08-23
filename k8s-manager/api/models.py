@@ -94,3 +94,34 @@ class Backup(models.Model):
 
     def __str__(self):
         return self.backup_id
+
+class BackupSchedule(models.Model):
+
+    app = models.ForeignKey(
+        App,
+        on_delete=models.CASCADE
+    )
+
+    source_path = models.CharField(
+        max_length=255
+    )
+
+    interval_minutes = models.PositiveIntegerField(
+        default=60
+    )
+
+    enabled = models.BooleanField(
+        default=True
+    )
+
+    last_run = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    def __str__(self):
+        return f"{self.app.name} every {self.interval_minutes} minutes"
