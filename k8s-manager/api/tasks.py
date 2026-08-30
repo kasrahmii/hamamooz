@@ -7,6 +7,7 @@ import base64
 from django.utils import timezone
 from datetime import timedelta
 import uuid
+from django.conf import settings
 
 @shared_task(name="api.tasks.run_backup")
 def run_backup(backup_id):
@@ -41,7 +42,12 @@ def run_backup(backup_id):
         )
 
 
-        backup_dir = f"backups/{app.id}/{date.today()}"
+        # backup_dir = f"backups/{app.id}/{date.today()}"
+        backup_dir = os.path.join(
+            settings.BACKUP_ROOT,
+            str(app.id),
+            str(date.today())
+        )
 
         os.makedirs(
             backup_dir,
