@@ -15,6 +15,7 @@ click-repl==0.3.0
 Django==6.1
 django-redis==7.0.0
 djangorestframework==3.18.0
+django-cors-headers==4.7.0
 durationpy==0.10
 frozenlist==1.8.0
 gunicorn==26.2.0
