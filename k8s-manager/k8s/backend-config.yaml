@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: backend-config
+  namespace: hamamooz
+
+data:
+  DEBUG: "False"
+
+  ALLOWED_HOSTS: "api.ahmadi.osdl.ir,localhost,127.0.0.1"
+
+  DB_PATH: "/persistent/db.sqlite3"
+
+  BACKUP_ROOT: "/persistent/backups"
+
+  CELERY_BROKER_URL: "redis://redis:6379/0"
+
+  CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+
+  REDIS_CACHE_URL: "redis://redis:6379/1"

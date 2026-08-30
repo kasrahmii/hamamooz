@@ -1,0 +1,146 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: backend
+  namespace: hamamooz
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: backend
+
+  template:
+    metadata:
+      labels:
+        app: backend
+
+    spec:
+
+      initContainers:
+        - name: migrate
+
+          image: kasrahmi/hamamooz-backend:v1
+
+          command:
+            - python
+            - manage.py
+            - migrate
+            - --noinput
+
+          envFrom:
+            - configMapRef:
+                name: backend-config
+
+            - secretRef:
+                name: backend-secret
+
+          volumeMounts:
+            - name: backend-data
+              mountPath: /persistent
+
+
+      containers:
+
+        # -------------------------
+        # Django
+        # -------------------------
+
+        - name: django
+
+          image: kasrahmi/hamamooz-backend:v1
+
+          imagePullPolicy: Always
+
+          command:
+            - gunicorn
+            - config.wsgi:application
+            - --bind
+            - 0.0.0.0:8000
+            - --workers
+            - "2"
+            - --timeout
+            - "120"
+
+          ports:
+            - containerPort: 8000
+
+          envFrom:
+            - configMapRef:
+                name: backend-config
+
+            - secretRef:
+                name: backend-secret
+
+          volumeMounts:
+            - name: backend-data
+              mountPath: /persistent
+
+
+        # -------------------------
+        # Celery Worker
+        # -------------------------
+
+        - name: celery-worker
+
+          image: kasrahmi/hamamooz-backend:v1
+
+          imagePullPolicy: Always
+
+          command:
+            - celery
+            - -A
+            - config
+            - worker
+            - --loglevel=info
+            - --concurrency=2
+
+          envFrom:
+            - configMapRef:
+                name: backend-config
+
+            - secretRef:
+                name: backend-secret
+
+          volumeMounts:
+            - name: backend-data
+              mountPath: /persistent
+
+
+        # -------------------------
+        # Celery Beat
+        # -------------------------
+
+        - name: celery-beat
+
+          image: kasrahmi/hamamooz-backend:v1
+
+          imagePullPolicy: Always
+
+          command:
+            - celery
+            - -A
+            - config
+            - beat
+            - --loglevel=info
+            - --schedule=/tmp/celerybeat-schedule
+
+          envFrom:
+            - configMapRef:
+                name: backend-config
+
+            - secretRef:
+                name: backend-secret
+
+          volumeMounts:
+            - name: backend-data
+              mountPath: /persistent
+
+
+      volumes:
+        - name: backend-data
+
+          persistentVolumeClaim:
+            claimName: backend-data
