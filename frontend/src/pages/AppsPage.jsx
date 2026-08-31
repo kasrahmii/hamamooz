@@ -4,23 +4,19 @@ import {
   Breadcrumb,
   Card,
   Button,
-  Form,
+  Modal,
   Input,
   InputNumber,
-  Modal,
   Space,
   Tag,
   Tooltip,
   Flex,
+  Form,
 } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { getClusters } from "../api/clusters";
 import { getNamespaces } from "../api/namespaces";
-import {
-  getApps,
-  createApp,
-  deleteApp,
-} from "../api/apps";
+import { getApps, createApp, deleteApp } from "../api/apps";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import EmptyState from "../components/EmptyState";
@@ -40,7 +36,11 @@ export default function AppsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
-  const [createForm] = Form.useForm();
+  const [appName, setAppName] = useState("");
+  const [appImage, setAppImage] = useState("");
+  const [appReplicas, setAppReplicas] = useState(1);
+  const [appCpu, setAppCpu] = useState("100m");
+  const [appMemory, setAppMemory] = useState("128Mi");
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -79,30 +79,33 @@ export default function AppsPage() {
     setApps(data);
   };
 
-  const handleCreate = async (values) => {
+  const resetCreateForm = () => {
+    setAppName("");
+    setAppImage("");
+    setAppReplicas(1);
+    setAppCpu("100m");
+    setAppMemory("128Mi");
+    setCreateError(null);
+  };
+
+  const handleCreate = async () => {
+    if (!appName.trim() || !appImage.trim()) {
+      setCreateError("Name and Image are required.");
+      return;
+    }
     setCreating(true);
     setCreateError(null);
     try {
-      // Force defaults directly on the payload
-      const payload = {
+      await createApp({
         namespace_id: Number(namespaceId),
-        name: values.name,
-        image: values.image,
-        replicas: 1,
-        cpu: "100m",
-        memory: "128Mi",
-        ...values,
-      };
-      // Override with form values if they exist and are valid
-      if (values.replicas !== undefined && values.replicas !== null && values.replicas !== "") {
-        payload.replicas = Number(values.replicas);
-      }
-      if (values.cpu) payload.cpu = values.cpu;
-      if (values.memory) payload.memory = values.memory;
-
-      await createApp(payload);
+        name: appName.trim(),
+        image: appImage.trim(),
+        replicas: Number(appReplicas) || 1,
+        cpu: appCpu || "100m",
+        memory: appMemory || "128Mi",
+      });
       setCreateOpen(false);
-      createForm.resetFields();
+      resetCreateForm();
       await refetchApps();
     } catch (e) {
       setCreateError(e.message);
@@ -113,6 +116,7 @@ export default function AppsPage() {
 
   const handleDelete = async () => {
     setDeleting(true);
+    setDeleteError(null);
     try {
       await deleteApp(deleteTarget.id);
       await refetchApps();
@@ -125,24 +129,46 @@ export default function AppsPage() {
   };
 
   if (loading) return <LoadingState text="Loading apps..." />;
-  if (error) return <ErrorState message={error} onRetry={() => window.location.reload()} />;
+  if (error)
+    return (
+      <ErrorState message={error} onRetry={() => window.location.reload()} />
+    );
 
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: "0 auto" }}>
       <Breadcrumb
         items={[
           { title: <Link to="/clusters">Clusters</Link> },
-          { title: <Link to={`/clusters/${clusterId}/namespaces`}>{cluster?.name || `Cluster ${clusterId}`}</Link> },
+          {
+            title: (
+              <Link to={`/clusters/${clusterId}/namespaces`}>
+                {cluster?.name || `Cluster ${clusterId}`}
+              </Link>
+            ),
+          },
           { title: namespace?.name || `Namespace ${namespaceId}` },
         ]}
         style={{ marginBottom: 16 }}
       />
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 24,
+        }}
+      >
         <h1 style={{ margin: 0 }}>
           Apps{namespace ? ` (${namespace.name})` : ""}
         </h1>
-        <Button type="primary" onClick={() => setCreateOpen(true)}>
+        <Button
+          type="primary"
+          onClick={() => {
+            resetCreateForm();
+            setCreateOpen(true);
+          }}
+        >
           <PlusOutlined /> Create App
         </Button>
       </div>
@@ -151,7 +177,13 @@ export default function AppsPage() {
         <EmptyState
           description="No apps found in this namespace."
           action={
-            <Button type="primary" onClick={() => setCreateOpen(true)}>
+            <Button
+              type="primary"
+              onClick={() => {
+                resetCreateForm();
+                setCreateOpen(true);
+              }}
+            >
               <PlusOutlined /> Create App
             </Button>
           }
@@ -160,7 +192,10 @@ export default function AppsPage() {
         <Flex wrap gap={[24, 16]}>
           {apps.map((app) => (
             <Card key={app.id} style={{ width: 360, minHeight: 220 }}>
-              <Card.Meta title={app.name} description={`Namespace: ${app.namespace}`} />
+              <Card.Meta
+                title={app.name}
+                description={`Namespace: ${app.namespace}`}
+              />
               <div style={{ marginTop: 12 }}>
                 <Space wrap>
                   <AppStatusBadge app={app} />
@@ -170,13 +205,21 @@ export default function AppsPage() {
               <div style={{ marginTop: 8, fontSize: 12, color: "#8c8c8c" }}>
                 {app.pods && app.pods.length > 0 ? (
                   <>
-                    {app.pods.filter((p) => p.ready).length} / {app.replicas} pods ready
+                    {app.pods.filter((p) => p.ready).length} / {app.replicas}{" "}
+                    pods ready
                   </>
                 ) : (
                   "No pods yet"
                 )}
               </div>
-              <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div
+                style={{
+                  marginTop: 16,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
                 <Button
                   type="primary"
                   onClick={() =>
@@ -207,61 +250,70 @@ export default function AppsPage() {
         cancelText="Cancel"
         onCancel={() => {
           setCreateOpen(false);
-          setCreateError(null);
-          createForm.resetFields();
+          resetCreateForm();
         }}
-        onOk={() => createForm.submit()}
+        onOk={handleCreate}
         confirmLoading={creating}
         width={600}
       >
         {createError && (
-          <div style={{ color: "#ff4d4f", marginBottom: 16 }}>{createError}</div>
+          <div style={{ color: "#ff4d4f", marginBottom: 16 }}>
+            {createError}
+          </div>
         )}
-        <Form
-            form={createForm}
-            layout="vertical"
-            onFinish={handleCreate}
-            preserve
-            initialValues={{
-              replicas: 1,
-              cpu: "100m",
-              memory: "128Mi",
-            }}
-          >
-          <Form.Item
-            label="App Name"
-            name="name"
-            rules={[{ required: true, message: "Please enter an app name" }]}
-          >
-            <Input placeholder="my-app" />
-          </Form.Item>
-
-          <Form.Item
-            label="Image"
-            name="image"
-            rules={[{ required: true, message: "Please enter a container image" }]}
-          >
-            <Input placeholder="nginx:latest" />
-          </Form.Item>
-
-          <Form.Item
-            label="Replicas"
-            name="replicas"
-            rules={[{ required: true, min: 1 }]}
-            initialValue={1}
-            preserve
-          >
-            <InputNumber min={1} defaultValue={1} style={{ width: "100%" }} />
-          </Form.Item>
-
-          <Form.Item label="CPU" name="cpu" initialValue="100m" preserve>
-            <Input defaultValue="100m" placeholder="100m" />
-          </Form.Item>
-
-          <Form.Item label="Memory" name="memory" initialValue="128Mi" preserve>
-            <Input defaultValue="128Mi" placeholder="128Mi" />
-          </Form.Item>
-        </Form>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div>
+            <label style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
+              App Name *
+            </label>
+            <Input
+              placeholder="my-app"
+              value={appName}
+              onChange={(e) => setAppName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
+              Image *
+            </label>
+            <Input
+              placeholder="nginx:latest"
+              value={appImage}
+              onChange={(e) => setAppImage(e.target.value)}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
+              Replicas
+            </label>
+            <InputNumber
+              min={1}
+              value={appReplicas}
+              onChange={(v) => setAppReplicas(v)}
+              style={{ width: "100%" }}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
+              CPU
+            </label>
+            <Input
+              placeholder="100m"
+              value={appCpu}
+              onChange={(e) => setAppCpu(e.target.value)}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
+              Memory
+            </label>
+            <Input
+              placeholder="128Mi"
+              value={appMemory}
+              onChange={(e) => setAppMemory(e.target.value)}
+            />
+          </div>
+        </div>
       </Modal>
 
       <ConfirmDialog
