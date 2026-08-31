@@ -83,14 +83,24 @@ export default function AppsPage() {
     setCreating(true);
     setCreateError(null);
     try {
-      await createApp({
+      // Force defaults directly on the payload
+      const payload = {
         namespace_id: Number(namespaceId),
         name: values.name,
         image: values.image,
-        replicas: Number(values.replicas) || 1,
-        cpu: values.cpu || "100m",
-        memory: values.memory || "128Mi",
-      });
+        replicas: 1,
+        cpu: "100m",
+        memory: "128Mi",
+        ...values,
+      };
+      // Override with form values if they exist and are valid
+      if (values.replicas !== undefined && values.replicas !== null && values.replicas !== "") {
+        payload.replicas = Number(values.replicas);
+      }
+      if (values.cpu) payload.cpu = values.cpu;
+      if (values.memory) payload.memory = values.memory;
+
+      await createApp(payload);
       setCreateOpen(false);
       createForm.resetFields();
       await refetchApps();
