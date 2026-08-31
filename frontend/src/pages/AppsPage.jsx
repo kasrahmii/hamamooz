@@ -229,15 +229,16 @@ export default function AppsPage() {
             name="replicas"
             rules={[{ required: true, min: 1 }]}
             initialValue={1}
+            preserve
           >
             <InputNumber min={1} style={{ width: "100%" }} />
           </Form.Item>
 
-          <Form.Item label="CPU" name="cpu" initialValue="100m">
+          <Form.Item label="CPU" name="cpu" initialValue="100m" preserve>
             <Input placeholder="100m" />
           </Form.Item>
 
-          <Form.Item label="Memory" name="memory" initialValue="128Mi">
+          <Form.Item label="Memory" name="memory" initialValue="128Mi" preserve>
             <Input placeholder="128Mi" />
           </Form.Item>
         </Form>
