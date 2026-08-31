@@ -11,8 +11,10 @@ import {
   Input,
   Tooltip,
   Alert,
+  Dropdown,
+  Menu,
 } from "antd";
-import { PlusOutlined, KeyOutlined } from "@ant-design/icons";
+import { PlusOutlined, KeyOutlined, EllipsisOutlined } from "@ant-design/icons";
 import { getClusters, createCluster, updateCluster } from "../api/clusters";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
@@ -154,18 +156,23 @@ export default function ClustersPage() {
                 >
                   View Namespaces
                 </Button>
-                <Tooltip title="Update authentication token">
-                  <Button
-                    icon={<KeyOutlined />}
-                    onClick={() => {
-                      setTokenError(null);
-                      tokenForm.resetFields();
-                      setTokenTarget(cluster);
-                    }}
-                  >
-                    Update Token
-                  </Button>
-                </Tooltip>
+                <Dropdown
+                  menu={{
+                    items: [
+                      {
+                        label: "Update Token",
+                        icon: <KeyOutlined />,
+                        onClick: () => {
+                          setTokenError(null);
+                          tokenForm.resetFields();
+                          setTokenTarget(cluster);
+                        },
+                      },
+                    ],
+                  }}
+                >
+                  <Button icon={<EllipsisOutlined />} />
+                </Dropdown>
               </div>
             </Card>
           ))}
