@@ -40,18 +40,33 @@ class AppCreateSerializer(serializers.Serializer):
 
     replicas = serializers.IntegerField(
         min_value=1,
-        default=1
+        default=1,
+        required=False,
+        allow_null=True
     )
 
     cpu = serializers.CharField(
         max_length=50,
-        default="100m"
+        default="100m",
+        required=False,
+        allow_null=True
     )
 
     memory = serializers.CharField(
         max_length=50,
-        default="128Mi"
+        default="128Mi",
+        required=False,
+        allow_null=True
     )
+
+    def validate(self, attrs):
+        if attrs.get("replicas") is None:
+            attrs["replicas"] = 1
+        if attrs.get("cpu") is None:
+            attrs["cpu"] = "100m"
+        if attrs.get("memory") is None:
+            attrs["memory"] = "128Mi"
+        return attrs
 
 class AppUpdateSerializer(serializers.Serializer):
     image = serializers.CharField(
