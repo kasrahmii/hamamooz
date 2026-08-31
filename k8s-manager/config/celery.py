@@ -1,6 +1,5 @@
 from celery import Celery
 import os
-from celery.schedules import crontab
 
 
 os.environ.setdefault(
@@ -15,11 +14,13 @@ app.config_from_object(
     namespace="CELERY"
 )
 
-app.conf.beat_schedule = {
-    "check-backup-schedules": {
-        "task": "api.tasks.check_backup_schedules",
-        "schedule": 60.0,
-    },
-}
+# Periodic backup scheduling deliberately disabled.
+# Add an explicit beat_schedule here if automated backups are needed later.
+# app.conf.beat_schedule = {
+#     "check-backup-schedules": {
+#         "task": "api.tasks.check_backup_schedules",
+#         "schedule": 60.0,
+#     },
+# }
 
 app.autodiscover_tasks()
