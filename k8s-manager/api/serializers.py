@@ -10,6 +10,14 @@ class ClusterSerializer(serializers.ModelSerializer):
             "token": {"write_only": True}
         }
 
+class ClusterUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Cluster
+        fields = ["address", "token", "name"]
+        extra_kwargs = {
+            "token": {"write_only": True, "required": False}
+        }
+
 class NamespaceCreateSerializer(serializers.Serializer):
     cluster_id = serializers.IntegerField()
     name = serializers.CharField(max_length=100)

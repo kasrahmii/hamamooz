@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     clusters,
+    cluster_detail,
     namespaces,
     namespace_detail,
     apps,
@@ -13,6 +14,7 @@ from .views import (
 
 urlpatterns = [
     path("clusters/", clusters),
+    path("clusters/<int:cluster_id>/", cluster_detail),
 
     path("namespaces/", namespaces),
     path("namespaces/<int:namespace_id>/", namespace_detail),

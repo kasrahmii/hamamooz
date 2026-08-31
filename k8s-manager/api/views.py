@@ -13,6 +13,7 @@ from kubernetes.client.rest import ApiException
 from .models import Cluster, Namespace, App
 from .serializers import (
     ClusterSerializer,
+    ClusterUpdateSerializer,
     NamespaceCreateSerializer,
     NamespaceSerializer,
     AppCreateSerializer,
@@ -134,6 +135,44 @@ def clusters(request):
             serializer.errors,
             status=status.HTTP_400_BAD_REQUEST
         )
+
+@api_view(["GET", "PATCH", "DELETE"])
+def cluster_detail(request, cluster_id):
+
+    try:
+        cluster = Cluster.objects.get(id=cluster_id)
+    except (Cluster.DoesNotExist, ValueError):
+        return Response(
+            {"error": "Cluster not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    if request.method == "GET":
+        return Response(ClusterSerializer(cluster).data)
+
+    if request.method == "DELETE":
+        cluster.delete()
+        return Response(
+            status=status.HTTP_204_NO_CONTENT
+        )
+
+    serializer = ClusterUpdateSerializer(
+        cluster,
+        data=request.data,
+        partial=True
+    )
+
+    if not serializer.is_valid():
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    serializer.save()
+
+    return Response(
+        ClusterSerializer(cluster).data
+    )
 
 @api_view(["GET", "POST"])
 @throttle_classes([NamespaceCreateThrottle])
