@@ -207,7 +207,17 @@ export default function AppsPage() {
         {createError && (
           <div style={{ color: "#ff4d4f", marginBottom: 16 }}>{createError}</div>
         )}
-        <Form form={createForm} layout="vertical" onFinish={handleCreate} preserve>
+        <Form
+            form={createForm}
+            layout="vertical"
+            onFinish={handleCreate}
+            preserve
+            initialValues={{
+              replicas: 1,
+              cpu: "100m",
+              memory: "128Mi",
+            }}
+          >
           <Form.Item
             label="App Name"
             name="name"
