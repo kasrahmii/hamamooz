@@ -87,7 +87,7 @@ export default function AppsPage() {
         namespace_id: Number(namespaceId),
         name: values.name,
         image: values.image,
-        replicas: Number(values.replicas),
+        replicas: Number(values.replicas) || 1,
         cpu: values.cpu || "100m",
         memory: values.memory || "128Mi",
       });
@@ -241,15 +241,15 @@ export default function AppsPage() {
             initialValue={1}
             preserve
           >
-            <InputNumber min={1} style={{ width: "100%" }} />
+            <InputNumber min={1} defaultValue={1} style={{ width: "100%" }} />
           </Form.Item>
 
           <Form.Item label="CPU" name="cpu" initialValue="100m" preserve>
-            <Input placeholder="100m" />
+            <Input defaultValue="100m" placeholder="100m" />
           </Form.Item>
 
           <Form.Item label="Memory" name="memory" initialValue="128Mi" preserve>
-            <Input placeholder="128Mi" />
+            <Input defaultValue="128Mi" placeholder="128Mi" />
           </Form.Item>
         </Form>
       </Modal>
