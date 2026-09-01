@@ -36,6 +36,8 @@ from .tasks import run_backup
 
 from django.core.cache import cache
 
+from .monitoring import k8s_inc
+
 
 @api_view(["GET"])
 def backup_status(request, backup_id):
@@ -242,8 +244,10 @@ def namespaces(request):
         )
 
         k8s.create_namespace(body=body)
+        k8s_inc("namespace", "create", True)
 
     except ApiException as e:
+        k8s_inc("namespace", "create", False)
         if e.status == 409:
             return Response(
                 {"error": "Namespace already exists in Kubernetes"},
@@ -268,6 +272,7 @@ def namespaces(request):
         )
 
     except Exception:
+        k8s_inc("namespace", "create", False)
         return Response(
             {"error": "Could not connect to Kubernetes"},
             status=status.HTTP_502_BAD_GATEWAY
@@ -308,9 +313,10 @@ def namespace_detail(request, namespace_id):
         k8s.delete_namespace(
             name=namespace.name
         )
+        k8s_inc("namespace", "delete", True)
 
     except ApiException as e:
-
+        k8s_inc("namespace", "delete", False)
         if e.status == 404:
             # It is already gone from Kubernetes.
             # Continue and remove it from our database.
@@ -335,6 +341,7 @@ def namespace_detail(request, namespace_id):
             )
 
     except Exception:
+        k8s_inc("namespace", "delete", False)
         return Response(
             {"error": "Could not connect to Kubernetes"},
             status=status.HTTP_502_BAD_GATEWAY
@@ -397,6 +404,7 @@ def apps(request):
             k8s = get_kubernetes_client(cluster)
 
         except Exception:
+            k8s_inc("app", "list", False)
             return Response(
                 {"error": "Could not connect to Kubernetes"},
                 status=status.HTTP_502_BAD_GATEWAY
@@ -413,8 +421,10 @@ def apps(request):
                     namespace=namespace.name,
                     label_selector=f"app={app.name}"
                 )
+                k8s_inc("app", "list", True)
 
             except ApiException as e:
+                k8s_inc("app", "list", False)
 
                 if e.status == 401:
                     return Response(
@@ -585,8 +595,10 @@ def apps(request):
             namespace=namespace.name,
             body=deployment
         )
+        k8s_inc("app", "create", True)
 
     except ApiException as e:
+        k8s_inc("app", "create", False)
 
         if e.status == 409:
             return Response(
@@ -621,6 +633,7 @@ def apps(request):
         )
 
     except Exception:
+        k8s_inc("app", "create", False)
         return Response(
             {"error": "Could not connect to Kubernetes"},
             status=status.HTTP_502_BAD_GATEWAY
@@ -682,8 +695,10 @@ def app_detail(request, app_id):
                     propagation_policy="Foreground"
                 )
             )
+            k8s_inc("app", "delete", True)
 
         except ApiException as e:
+            k8s_inc("app", "delete", False)
 
             if e.status == 404:
                 # Deployment is already gone from Kubernetes.
@@ -709,6 +724,7 @@ def app_detail(request, app_id):
                 )
 
         except Exception:
+            k8s_inc("app", "delete", False)
             return Response(
                 {"error": "Could not connect to Kubernetes"},
                 status=status.HTTP_502_BAD_GATEWAY
@@ -793,8 +809,10 @@ def app_detail(request, app_id):
             namespace=namespace.name,
             body=patch_body
         )
+        k8s_inc("app", "update", True)
 
     except ApiException as e:
+        k8s_inc("app", "update", False)
 
         if e.status == 404:
             return Response(
@@ -826,6 +844,7 @@ def app_detail(request, app_id):
         )
 
     except Exception:
+        k8s_inc("app", "update", False)
         return Response(
             {"error": "Could not connect to Kubernetes"},
             status=status.HTTP_502_BAD_GATEWAY

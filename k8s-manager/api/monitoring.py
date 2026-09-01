@@ -6,6 +6,7 @@ Django < 6.1).
 """
 
 import time
+from functools import wraps
 
 from django.http import HttpResponse
 
@@ -53,6 +54,73 @@ BACKUPS_BY_STATUS = Gauge(
     "Number of backups by status.",
     ["status"],
 )
+
+# Kubernetes operation metrics
+K8S_OPERATIONS_TOTAL = Counter(
+    "hamamooz_kubernetes_operations_total",
+    "Total number of Kubernetes operations by resource/operation/outcome.",
+    ["resource", "operation", "outcome"],
+)
+
+K8S_OPERATION_DURATION = Histogram(
+    "hamamooz_kubernetes_operation_duration_seconds",
+    "Duration of Kubernetes operations in seconds.",
+    ["resource", "operation"],
+    buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60),
+)
+
+
+def k8s_operation(resource, operation):
+    """Count a Kubernetes operation by outcome and record its duration.
+
+    ``resource`` is one of: cluster, namespace, app.
+    ``operation`` is one of: create, list, update, delete.
+
+    Apply to a Django view (or any callable) that performs a single
+    Kubernetes operation. The operation is counted as ``success`` when the
+    wrapped callable returns normally with a 2xx/3xx response, and as
+    ``error`` when it raises or returns a 4xx/5xx response.
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            start = time.perf_counter()
+            try:
+                result = func(*args, **kwargs)
+                outcome = "success"
+                status_code = getattr(result, "status_code", 200)
+                if 400 <= status_code < 600:
+                    outcome = "error"
+            except Exception:
+                outcome = "error"
+                raise
+            finally:
+                K8S_OPERATIONS_TOTAL.labels(
+                    resource=resource,
+                    operation=operation,
+                    outcome=outcome,
+                ).inc()
+                K8S_OPERATION_DURATION.labels(
+                    resource=resource,
+                    operation=operation,
+                ).observe(time.perf_counter() - start)
+            return result
+        return wrapper
+    return decorator
+
+
+def k8s_inc(resource, operation, ok):
+    """Lightweight inline counter for a Kubernetes operation outcome.
+
+    Use at the call site of an actual Kubernetes client method so the count
+    maps to the real create/list/delete call (success vs error), independent
+    of the HTTP response status of the surrounding view.
+    """
+    K8S_OPERATIONS_TOTAL.labels(
+        resource=resource,
+        operation=operation,
+        outcome="success" if ok else "error",
+    ).inc()
 
 
 class PrometheusMiddleware:
