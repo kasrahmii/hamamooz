@@ -6,6 +6,7 @@ Django < 6.1).
 """
 
 import time
+from contextlib import contextmanager
 from functools import wraps
 
 from django.http import HttpResponse
@@ -68,6 +69,64 @@ K8S_OPERATION_DURATION = Histogram(
     ["resource", "operation"],
     buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60),
 )
+
+# Backup metrics
+BACKUP_JOBS_TOTAL = Gauge(
+    "hamamooz_backup_jobs_total",
+    "Number of backup jobs that reached a terminal outcome.",
+    ["outcome"],
+)
+
+BACKUP_DURATION_SECONDS = Histogram(
+    "hamamooz_backup_duration_seconds",
+    "Duration of backup operations in seconds.",
+    buckets=(1, 5, 10, 30, 60, 120, 300, 600, 1800, 3600),
+)
+
+BACKUPS_IN_PROGRESS = Gauge(
+    "hamamooz_backups_in_progress",
+    "Number of backup jobs currently running.",
+)
+
+
+def reset_histogram(histogram):
+    """Reset a label-less histogram's accumulated state to zero.
+
+    Used for DB-derived snapshots that are rebuilt on every scrape (the
+    standard Histogram accumulates across scrapes, which would otherwise
+    inflate counts for gauge-like values). Relies on prometheus_client
+    internals for the fixed 0.26.x layout.
+    """
+    histogram._sum.set(0)
+    for bucket in histogram._buckets:
+        bucket.set(0)
+
+
+@contextmanager
+def k8s_op_metric(resource, operation):
+    """Context manager that counts a K8s operation and records its duration.
+
+    Usage::
+
+        with k8s_op_metric("namespace", "create"):
+            k8s.create_namespace(body=body)
+    """
+    start = time.perf_counter()
+    ok = False
+    try:
+        yield
+        ok = True
+    finally:
+        outcome = "success" if ok else "error"
+        K8S_OPERATIONS_TOTAL.labels(
+            resource=resource,
+            operation=operation,
+            outcome=outcome,
+        ).inc()
+        K8S_OPERATION_DURATION.labels(
+            resource=resource,
+            operation=operation,
+        ).observe(time.perf_counter() - start)
 
 
 def k8s_operation(resource, operation):
@@ -162,6 +221,31 @@ def metrics_view(request):
         BACKUPS_BY_STATUS.labels(status=status_value).set(
             Backup.objects.filter(status=status_value).count()
         )
+
+    # Backup job terminal outcomes (counter-style gauge computed from DB)
+    finished_backups = Backup.objects.filter(
+        status__in=["completed", "failed"]
+    )
+    BACKUP_JOBS_TOTAL.labels(outcome="completed").set(
+        finished_backups.filter(status="completed").count()
+    )
+    BACKUP_JOBS_TOTAL.labels(outcome="failed").set(
+        finished_backups.filter(status="failed").count()
+    )
+
+    # Backup durations: computed from updated_at - created_at for finished jobs.
+    # Reset histogram first so values are rebuilt from the current DB snapshot
+    # on every scrape (the standard Histogram accumulates across scrapes).
+    reset_histogram(BACKUP_DURATION_SECONDS)
+    for backup in finished_backups:
+        duration = (backup.updated_at - backup.created_at).total_seconds()
+        if duration >= 0:
+            BACKUP_DURATION_SECONDS.observe(duration)
+
+    # Backups currently running
+    BACKUPS_IN_PROGRESS.set(
+        Backup.objects.filter(status="running").count()
+    )
 
     data = generate_latest()
     return HttpResponse(data, content_type=CONTENT_TYPE_LATEST)
